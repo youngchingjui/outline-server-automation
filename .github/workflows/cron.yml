@@ -1,0 +1,10 @@
+name: Create New Server
+on:
+  schedule:
+    - cron: "0 6,14,22 * * *"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run script
+        run: bash main.sh 2>&1
