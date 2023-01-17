@@ -1,7 +1,7 @@
 name: Create New Server
 on:
   schedule:
-    - cron: "0 6,14,22 * * *"
+    - cron: "35 6,14,15,22 * * *"
 jobs:
   build:
     runs-on: ubuntu-latest
