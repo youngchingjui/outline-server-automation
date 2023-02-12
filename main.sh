@@ -6,6 +6,9 @@
 # DEBUG: Output each command as they are executed, for more visibility
 # set -x
 
+# Make tmp directory, if it does not exist
+mkdir -p tmp
+
 # Set key variable names
 KEY_PAIR_FILENAME=LightsailDefaultKey-ap-northeast-2.pem
 INSTALLATION_OUTPUT_FILEPATH=tmp/installation_output.txt
