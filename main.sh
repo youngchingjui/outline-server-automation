@@ -11,45 +11,64 @@ KEY_PAIR_FILENAME=LightsailDefaultKey-ap-northeast-2.pem
 INSTALLATION_OUTPUT_FILEPATH=tmp/installation_output.txt
 INSTANCE_NUMBER_FILEPATH=tmp/instance_number.txt
 
-# Check if an instance name was provided as an argument
-if [ -z "$1" ]; then    
+# Default values
+AVAILABILITY_ZONE=ap-northeast-2a
+DELETE_INSTANCES=1
+RAND=$(openssl rand -hex 16 | tr -d '\n') # Generate random string for instance name
+INSTANCE_NAME="Outline-Server-$RAND" # Assign default name
 
-    # Check if `instance_number.txt`` file exists
-    if [ -f $INSTANCE_NUMBER_FILEPATH ]; then
-    # The file exists, so load the data from the file
-    instance_number=$(cat $INSTANCE_NUMBER_FILEPATH)
+# Get optional arguments
+while [[ $# -gt 0 ]]
+do
+  key="$1"
 
-    else
-    # The file does not exist, so create it and set the data to "1"
-    echo "1" | tee $INSTANCE_NUMBER_FILEPATH
-    instance_number=1
-    fi
+  case $key in
 
-    # Generate the instance name based on the current instance number
-    instance_name="outline-temp$instance_number"
+    --name)
+    # Name of server
+    INSTANCE_NAME="$2"
+    shift # past argument
+    shift # past value
+    ;;
 
-else
-    # Use the provided instance name
-    instance_name=$1
-fi
+    --zone)
+    # Set the availability zone of the server
+    AVAILABILITY_ZONE="$2"
+    shift # past argument
+    shift # past value
+    ;;
+
+    --verbose)
+    # Turn on logging
+    set -x
+    shift # past argument
+    ;;
+
+    --do-not-delete)
+    # Do not automatically delete instances after successfully creating servers
+    DELETE_INSTANCES=0
+    shift # past argument
+    ;;
+
+    *)    # unknown option
+    ;;
+  esac
+done
 
 # Launch a new AWS Lightsail instance
-echo "Creating new AWS Lightsail instance with name $instance_name"
-aws lightsail create-instances --instance-name $instance_name --availability-zone "ap-northeast-2a" --blueprint-id "ubuntu_20_04" --bundle-id "nano_2_0"
+echo "Creating new AWS Lightsail instance with name $INSTANCE_NAME in availability zone $AVAILABILITY_ZONE"
+echo "Delete instances? $DELETE_INSTANCES"
+aws lightsail create-instances --instance-name $INSTANCE_NAME --availability-zone $AVAILABILITY_ZONE --blueprint-id "ubuntu_20_04" --bundle-id "nano_2_0"
 
 if [ $? -ne 0 ]; then
     echo "Did not create instance successfully"
     exit 1
 fi
 
-# If instance launched successfully, increase the instance number
-instance_number=$((++instance_number))
-echo $instance_number | tee $INSTANCE_NUMBER_FILEPATH
-
 # Wait for the instance to be launched
 echo "Waiting for instance to finish launching"
 while true; do
-    state=$(aws lightsail get-instance --instance-name $instance_name | jq -r '.instance.state.name')
+    state=$(aws lightsail get-instance --instance-name $INSTANCE_NAME | jq -r '.instance.state.name')
     if [ "$state" == "running" ]; then
         break
     fi
@@ -59,12 +78,12 @@ done
 
 # Get the public IP address of the instance
 echo "Getting public IP address of instance"
-instance_ip=$(aws lightsail get-instance --instance-name $instance_name | jq -r '.instance.publicIpAddress')
+instance_ip=$(aws lightsail get-instance --instance-name $INSTANCE_NAME | jq -r '.instance.publicIpAddress')
 echo $instance_ip
 
 # Open the necessary ports in the instance's firewall
 echo "Opening necessary ports on the instance"
-aws lightsail open-instance-public-ports --instance-name $instance_name --port-info fromPort=0,protocol=all,toPort=65535
+aws lightsail open-instance-public-ports --instance-name $INSTANCE_NAME --port-info fromPort=0,protocol=all,toPort=65535
 
 # Check if INSTALLATION_OUTPUT_FILEPATH exists
 if [ ! -f $INSTALLATION_OUTPUT_FILEPATH ]; then
@@ -131,10 +150,7 @@ done
 # Upload the new ssLink to S3
 . ./scripts/upload-sslink-to-s3.sh $ssLink
 
-# Once all setup, delete all older Lightsail instances, except for the newest one installed
-. ./scripts/delete-all-lightsail-instances-except-this.sh $instance_name
-
-
-
-
-
+if [ $DELETE_INSTANCES -eq 1 ]; then
+    # Once all setup, delete all older Lightsail instances, except for the newest one installed
+    . ./scripts/delete-all-lightsail-instances-except-this.sh $INSTANCE_NAME
+fi
