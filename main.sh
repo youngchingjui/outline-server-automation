@@ -10,7 +10,6 @@
 mkdir -p tmp
 
 # Set key variable names
-KEY_PAIR_FILENAME=LightsailDefaultKey-ap-northeast-2.pem
 INSTALLATION_OUTPUT_FILEPATH=tmp/installation_output.txt
 INSTANCE_NUMBER_FILEPATH=tmp/instance_number.txt
 
@@ -102,11 +101,15 @@ max_attempts=5
 # Set a counter variable to track the number of attempts
 attempts=0
 
+# Get private key from env
+echo "$LIGHTSAIL_PRIVATE_KEY" > private.pem
+chmod 400 private.pem
+
 # Attempt to connect to the server in a loop
 echo "Attempting to ssh into the server"
 while [ $attempts -lt $max_attempts ]; do
   # Connect to the instance and run the remote-script, and save the output to `INSTALLATION_OUTPUT_FILEPATH`
-  ssh -o StrictHostKeyChecking=no -i ~/.ssh/$KEY_PAIR_FILENAME ubuntu@$instance_ip 'bash -s' < ./scripts/remote-script.sh > $INSTALLATION_OUTPUT_FILEPATH
+  ssh -o StrictHostKeyChecking=no -i private.pem ubuntu@$instance_ip 'bash -s' < ./scripts/remote-script.sh > $INSTALLATION_OUTPUT_FILEPATH
   if [ $? -eq 0 ]; then
     # The connection succeeded, so break out of the loop
     break

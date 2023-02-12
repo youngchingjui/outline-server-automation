@@ -20,4 +20,5 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Run script
+        env: LIGHTSAIL_PRIVATE_KEY_BASE64: ${{ secrets.LIGHTSAIL_PRIVATE_KEY_BASE64 }}
         run: bash main.sh 2>&1
