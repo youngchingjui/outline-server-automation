@@ -9,11 +9,13 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ap-northeast-2
+          role-to-assume: arn:aws:iam::362142771237:role/github-actions-role
+          role-session-name: Github Actions Session
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Run script
         run: bash main.sh 2>&1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: "ap-northeast-2"
