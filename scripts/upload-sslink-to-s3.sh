@@ -1,6 +1,9 @@
 #!/bin/bash
 
-SS_LINK_FILEPATH=tmp/sslink.txt
+SS_LINK_FILEPATH=sslink.txt
+
+# Remove temp files on exit
+trap "rm -f $SS_LINK_FILEPATH" EXIT
 
 # Retrieve ssLink from input
 ssLink=$1

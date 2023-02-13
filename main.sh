@@ -6,18 +6,49 @@
 # DEBUG: Output each command as they are executed, for more visibility
 # set -x
 
-# Make tmp directory, if it does not exist
-mkdir -p tmp
+# Set temp filepath names
+INSTALLATION_OUTPUT_FILEPATH=output.txt
+PRIVATE_KEY_FILENAME=private.pem
 
-# Set key variable names
-INSTALLATION_OUTPUT_FILEPATH=tmp/installation_output.txt
-INSTANCE_NUMBER_FILEPATH=tmp/instance_number.txt
+touch $INSTALLATION_OUTPUT_FILEPATH
+
+# Remove temp files on exit
+trap "rm -f $INSTALLATION_OUTPUT_FILEPATH" EXIT
+trap "rm -f $PRIVATE_KEY_FILENAME" EXIT
 
 # Default values
 AVAILABILITY_ZONE=ap-northeast-2a
 DELETE_INSTANCES=1
 RAND=$(openssl rand -hex 16 | tr -d '\n') # Generate random string for instance name
 INSTANCE_NAME="Outline-Server-$RAND" # Assign default name
+
+# If `env.sh` file exists, then run it on bash
+if [ -f env.sh ]; then
+  echo "Loading env variables from local env.sh file"
+  source env.sh
+fi
+
+# Check if env variables are loaded, either locally or from GitHub secrets, or other places. If not, exit with code 1
+if [ -z "$LIGHTSAIL_PRIVATE_KEY_BASE64" ]; then
+  echo "LIGHTSAIL_PRIVATE_KEY_BASE64 is not set"
+  exit 1
+fi
+
+# Get private key from env and save locally
+echo $LIGHTSAIL_PRIVATE_KEY_BASE64 | base64 --decode > $PRIVATE_KEY_FILENAME
+chmod 400 $PRIVATE_KEY_FILENAME
+
+# Check that the private key file exists
+if [ ! -f $PRIVATE_KEY_FILENAME ]; then
+  echo "Private key file does not exist"
+  exit 1
+fi
+
+# Check that the private key file contains a private key
+if ! grep -q "PRIVATE KEY" "$PRIVATE_KEY_FILENAME"; then
+  echo "Private key file does not contain a private key"
+  exit 1
+fi
 
 # Get optional arguments
 while [[ $# -gt 0 ]]
@@ -87,29 +118,17 @@ echo $instance_ip
 echo "Opening necessary ports on the instance"
 aws lightsail open-instance-public-ports --instance-name $INSTANCE_NAME --port-info fromPort=0,protocol=all,toPort=65535
 
-# Check if INSTALLATION_OUTPUT_FILEPATH exists
-if [ ! -f $INSTALLATION_OUTPUT_FILEPATH ]; then
-
-    # Create the INSTALLATION_OUTPUT_FILEPATH file
-    touch $INSTALLATION_OUTPUT_FILEPATH
-
-fi
-
 # Set the maximum number of attempts
 max_attempts=5
 
 # Set a counter variable to track the number of attempts
 attempts=0
 
-# Get private key from env
-echo "$LIGHTSAIL_PRIVATE_KEY" > private.pem
-chmod 400 private.pem
-
 # Attempt to connect to the server in a loop
 echo "Attempting to ssh into the server"
 while [ $attempts -lt $max_attempts ]; do
   # Connect to the instance and run the remote-script, and save the output to `INSTALLATION_OUTPUT_FILEPATH`
-  ssh -o StrictHostKeyChecking=no -i private.pem ubuntu@$instance_ip 'bash -s' < ./scripts/remote-script.sh > $INSTALLATION_OUTPUT_FILEPATH
+  ssh -o StrictHostKeyChecking=no -i $PRIVATE_KEY_FILENAME ubuntu@$instance_ip 'bash -s' < ./scripts/remote-script.sh > $INSTALLATION_OUTPUT_FILEPATH
   if [ $? -eq 0 ]; then
     # The connection succeeded, so break out of the loop
     break
@@ -117,7 +136,7 @@ while [ $attempts -lt $max_attempts ]; do
     # The connection failed, so increment the attempts counter and try again
     attempts=$((attempts+1))
     echo "Failed attempt #$attempts"
-    sleep 5
+    sleep 10
   fi
 done
 
