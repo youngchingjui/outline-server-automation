@@ -30,6 +30,7 @@ fi
 
 # Check if env variables are loaded, either locally or from GitHub secrets, or other places. If not, exit with code 1
 if [ -z "$LIGHTSAIL_PRIVATE_KEY_BASE64" ]; then
+  echo $LIGHTSAIL_PRIVATE_KEY_BASE64
   echo "LIGHTSAIL_PRIVATE_KEY_BASE64 is not set"
   exit 1
 fi
