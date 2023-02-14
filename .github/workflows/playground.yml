@@ -1,0 +1,23 @@
+name: Playground
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ap-northeast-2
+          role-to-assume: arn:aws:iam::362142771237:role/github-actions-role
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Testing code
+        run: bash playground.sh
