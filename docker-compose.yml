@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  outline-cycler:
+    build: .
+    container_name: outline-cycler
+    restart: unless-stopped
+    environment:
+      # Provide AWS credentials or rely on EC2 instance role
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+
+      # Lightsail SSH private key (base64-encoded, single line)
+      - LIGHTSAIL_PRIVATE_KEY_BASE64=${LIGHTSAIL_PRIVATE_KEY_BASE64}
+
+      # Optional settings
+      - AVAILABILITY_ZONE=${AVAILABILITY_ZONE}
+      - CRON_SCHEDULE=${CRON_SCHEDULE}
+      - S3_URI=${S3_URI}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_KEY=${S3_KEY}
+      - S3_ACL=${S3_ACL}
+      - TZ=${TZ}
+
+    volumes:
+      # Persist cron logs to the host (optional)
+      - ./logs:/var/log
+

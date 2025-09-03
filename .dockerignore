@@ -1,0 +1,8 @@
+# Exclude VCS and local files from build context
+.git
+.gitignore
+node_modules
+.DS_Store
+logs
+.env
+
