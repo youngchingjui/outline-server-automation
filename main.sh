@@ -17,15 +17,30 @@ trap "rm -f $INSTALLATION_OUTPUT_FILEPATH" EXIT
 trap "rm -f $PRIVATE_KEY_FILENAME" EXIT
 
 # Default values
-AVAILABILITY_ZONE=ap-northeast-2a
+AVAILABILITY_ZONE=ap-northeast-1a
 DELETE_INSTANCES=1
 RAND=$(openssl rand -hex 16 | tr -d '\n') # Generate random string for instance name
 INSTANCE_NAME="Outline-Server-$RAND" # Assign default name
+KEYPAIR_NAME=""
 
 # If `env.sh` file exists, then run it on bash
 if [ -f env.sh ]; then
   echo "Loading env variables from local env.sh file"
   source env.sh
+fi
+
+# If `.env` file exists, load it as well (supports simple KEY=VALUE lines)
+if [ -f .env ]; then
+  echo "Loading env variables from local .env file"
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+# If not provided via CLI, derive KEYPAIR_NAME from LIGHTSAIL_KEYPAIR_NAME loaded above
+if [ -z "$KEYPAIR_NAME" ] && [ -n "$LIGHTSAIL_KEYPAIR_NAME" ]; then
+  KEYPAIR_NAME="$LIGHTSAIL_KEYPAIR_NAME"
 fi
 
 # Check if env variables are loaded, either locally or from GitHub secrets, or other places. If not, exit with code 1
@@ -78,6 +93,13 @@ do
     shift # past argument
     ;;
 
+    --keypair)
+    # Lightsail key pair name to attach to the instance
+    KEYPAIR_NAME="$2"
+    shift # past argument
+    shift # past value
+    ;;
+
     --do-not-delete)
     # Do not automatically delete instances after successfully creating servers
     DELETE_INSTANCES=0
@@ -89,10 +111,19 @@ do
   esac
 done
 
+# Derive AWS region from availability zone (e.g. ap-northeast-1a -> ap-northeast-1)
+REGION="${AVAILABILITY_ZONE%[a-z]}"
+
 # Launch a new AWS Lightsail instance
 echo "Creating new AWS Lightsail instance with name $INSTANCE_NAME in availability zone $AVAILABILITY_ZONE"
 echo "Delete instances? $DELETE_INSTANCES"
-aws lightsail create-instances --instance-name $INSTANCE_NAME --availability-zone $AVAILABILITY_ZONE --blueprint-id "ubuntu_20_04" --bundle-id "nano_2_0"
+if [ -n "$KEYPAIR_NAME" ]; then
+  echo "Using key pair name: $KEYPAIR_NAME"
+  aws lightsail create-instances --region $REGION --instance-name $INSTANCE_NAME --availability-zone $AVAILABILITY_ZONE --blueprint-id "ubuntu_24_04" --bundle-id "nano_2_0" --key-pair-name "$KEYPAIR_NAME"
+else
+  echo "No key pair name provided; will use Lightsail default key pair for region $REGION"
+  aws lightsail create-instances --region $REGION --instance-name $INSTANCE_NAME --availability-zone $AVAILABILITY_ZONE --blueprint-id "ubuntu_24_04" --bundle-id "nano_2_0"
+fi
 
 if [ $? -ne 0 ]; then
     echo "Did not create instance successfully"
@@ -102,7 +133,7 @@ fi
 # Wait for the instance to be launched
 echo "Waiting for instance to finish launching"
 while true; do
-    state=$(aws lightsail get-instance --instance-name $INSTANCE_NAME | jq -r '.instance.state.name')
+    state=$(aws lightsail get-instance --region $REGION --instance-name $INSTANCE_NAME | jq -r '.instance.state.name')
     if [ "$state" == "running" ]; then
         break
     fi
@@ -112,12 +143,12 @@ done
 
 # Get the public IP address of the instance
 echo "Getting public IP address of instance"
-instance_ip=$(aws lightsail get-instance --instance-name $INSTANCE_NAME | jq -r '.instance.publicIpAddress')
+instance_ip=$(aws lightsail get-instance --region $REGION --instance-name $INSTANCE_NAME | jq -r '.instance.publicIpAddress')
 echo $instance_ip
 
 # Open the necessary ports in the instance's firewall
 echo "Opening necessary ports on the instance"
-aws lightsail open-instance-public-ports --instance-name $INSTANCE_NAME --port-info fromPort=0,protocol=all,toPort=65535
+aws lightsail open-instance-public-ports --region $REGION --instance-name $INSTANCE_NAME --port-info fromPort=0,protocol=all,toPort=65535
 
 # Set the maximum number of attempts
 max_attempts=5

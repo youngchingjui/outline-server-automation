@@ -9,7 +9,7 @@
 # Example:
 #   scripts/create-lightsail-instance.sh \
 #     -n my-outline \
-#     -b ubuntu_22_04 \
+#     -b ubuntu_24_04 \
 #     -B nano_2_0 \
 #     -r us-east-1 \
 #     -z us-east-1a \
@@ -22,7 +22,7 @@ usage() {
   echo
   echo "Options:"
   echo "  -n   Instance name (required)"
-  echo "  -b   Blueprint ID (default: ubuntu_22_04)"
+  echo "  -b   Blueprint ID (default: ubuntu_24_04)"
   echo "  -B   Bundle ID (default: nano_2_0)"
   echo "  -r   AWS region (defaults to AWS CLI config/AWS_REGION env)"
   echo "  -z   Availability zone (e.g., us-east-1a)"
@@ -32,7 +32,7 @@ usage() {
 }
 
 INSTANCE_NAME=""
-BLUEPRINT_ID="${BLUEPRINT_ID:-ubuntu_22_04}"
+BLUEPRINT_ID="${BLUEPRINT_ID:-ubuntu_24_04}"
 BUNDLE_ID="${BUNDLE_ID:-nano_2_0}"
 REGION="${AWS_REGION:-${REGION:-}}"
 AVAILABILITY_ZONE="${AVAILABILITY_ZONE:-}"

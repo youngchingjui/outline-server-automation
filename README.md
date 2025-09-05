@@ -17,7 +17,7 @@ Example usage:
 ```bash
 ./scripts/create-lightsail-instance.sh \
   -n my-outline \
-  -b ubuntu_22_04 \
+  -b ubuntu_24_04 \
   -B nano_2_0 \
   -r us-east-1 \
   -z us-east-1a \
@@ -29,7 +29,7 @@ Example usage:
 Flags:
 
 - `-n` Instance name (required)
-- `-b` Blueprint ID (default: `ubuntu_22_04`)
+- `-b` Blueprint ID (default: `ubuntu_24_04`)
 - `-B` Bundle ID (default: `nano_2_0`)
 - `-r` Region (falls back to `AWS_REGION` or AWS CLI default)
 - `-z` Availability Zone (e.g., `us-east-1a`)
@@ -50,6 +50,7 @@ Authentication can be provided via any standard AWS mechanism:
 This repository now includes a Docker image and docker-compose setup that runs the automation every 6 hours via cron inside the container.
 
 What it does on each run:
+
 - Creates a new AWS Lightsail instance
 - Installs Outline via the official install script
 - Retrieves the access key (ss URL) from the Outline API
@@ -72,7 +73,7 @@ base64 -w 0 < /path/to/LightsailDefaultKey-<region>.pem
 
 ### Configure and start
 
-1) Create a `.env` file next to `docker-compose.yml` with at least:
+1. Create a `.env` file next to `docker-compose.yml` with at least:
 
 ```
 # Either rely on EC2 instance role or set these explicitly
@@ -85,7 +86,7 @@ AWS_REGION=ap-northeast-2
 LIGHTSAIL_PRIVATE_KEY_BASE64=...base64-blob...
 
 # Optional overrides
-# AVAILABILITY_ZONE=ap-northeast-2a
+# AVAILABILITY_ZONE=ap-northeast-1a
 # CRON_SCHEDULE=0 */6 * * *
 # S3_URI=s3://my-bucket/custom/path.txt
 # S3_BUCKET=my-bucket
@@ -95,17 +96,18 @@ LIGHTSAIL_PRIVATE_KEY_BASE64=...base64-blob...
 ```
 
 Notes:
+
 - Provide either `S3_URI` (full `s3://bucket/key`) or `S3_BUCKET` (and optional `S3_KEY`). If neither is provided, the default `s3://outline-link/sslink.txt` is used.
 - `CRON_SCHEDULE` uses standard cron syntax. Default is every 6 hours.
 - If your EC2 instance has an IAM role, you can omit the AWS credential env vars.
 
-2) Start the service:
+2. Start the service:
 
 ```bash
 docker compose up -d --build
 ```
 
-3) View logs:
+3. View logs:
 
 ```bash
 docker logs -f outline-cycler
@@ -131,6 +133,7 @@ docker logs -f outline-cycler
 ## S3 upload configuration
 
 The upload script supports environment variables:
+
 - `S3_URI` (full URI) or `S3_BUCKET` and optional `S3_KEY` (defaults to `sslink.txt`).
 - `S3_ACL` for object ACL (defaults to `public-read`).
 
@@ -139,4 +142,3 @@ The upload script supports environment variables:
 ## Alternatives to cycling Lightsail IPs
 
 See `docs/ALTERNATIVES.md` for other approaches to rotate or shield IP addresses to reduce blocking while keeping costs in check.
-
