@@ -3,3 +3,4 @@ env.sh
 text.pem
 output.txt
 private.pem
+.env
