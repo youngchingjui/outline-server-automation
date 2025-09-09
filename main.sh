@@ -8,13 +8,17 @@
 
 # Set temp filepath names
 INSTALLATION_OUTPUT_FILEPATH=output.txt
-PRIVATE_KEY_FILENAME=private.pem
+PRIVATE_KEY_FILENAME=/tmp/private.pem
 
 touch $INSTALLATION_OUTPUT_FILEPATH
 
 # Remove temp files on exit
 trap "rm -f $INSTALLATION_OUTPUT_FILEPATH" EXIT
 trap "rm -f $PRIVATE_KEY_FILENAME" EXIT
+
+# Disable AWS CLI pager in non-interactive environment
+export AWS_PAGER=""
+export AWS_CLI_PAGER=""
 
 # Default values
 AVAILABILITY_ZONE=ap-northeast-1a
@@ -45,7 +49,9 @@ fi
 
 # Resolve private key: prefer pre-decoded file, fallback to base64 env
 if [ -n "${LIGHTSAIL_PRIVATE_KEY_FILE-}" ] && [ -f "$LIGHTSAIL_PRIVATE_KEY_FILE" ]; then
-  cp "$LIGHTSAIL_PRIVATE_KEY_FILE" "$PRIVATE_KEY_FILENAME"
+  if [ "$LIGHTSAIL_PRIVATE_KEY_FILE" != "$PRIVATE_KEY_FILENAME" ]; then
+    cp "$LIGHTSAIL_PRIVATE_KEY_FILE" "$PRIVATE_KEY_FILENAME"
+  fi
   chmod 400 "$PRIVATE_KEY_FILENAME"
 elif [ -n "${LIGHTSAIL_PRIVATE_KEY_BASE64-}" ]; then
   umask 077
@@ -124,10 +130,10 @@ echo "Creating new AWS Lightsail instance with name $INSTANCE_NAME in availabili
 echo "Delete instances? $DELETE_INSTANCES"
 if [ -n "$KEYPAIR_NAME" ]; then
   echo "Using key pair name: $KEYPAIR_NAME"
-  aws lightsail create-instances --region $REGION --instance-name $INSTANCE_NAME --availability-zone $AVAILABILITY_ZONE --blueprint-id "ubuntu_24_04" --bundle-id "nano_2_0" --key-pair-name "$KEYPAIR_NAME"
+  aws --no-cli-pager lightsail create-instances --region $REGION --instance-name $INSTANCE_NAME --availability-zone $AVAILABILITY_ZONE --blueprint-id "ubuntu_24_04" --bundle-id "nano_2_0" --key-pair-name "$KEYPAIR_NAME"
 else
   echo "No key pair name provided; will use Lightsail default key pair for region $REGION"
-  aws lightsail create-instances --region $REGION --instance-name $INSTANCE_NAME --availability-zone $AVAILABILITY_ZONE --blueprint-id "ubuntu_24_04" --bundle-id "nano_2_0"
+  aws --no-cli-pager lightsail create-instances --region $REGION --instance-name $INSTANCE_NAME --availability-zone $AVAILABILITY_ZONE --blueprint-id "ubuntu_24_04" --bundle-id "nano_2_0"
 fi
 
 if [ $? -ne 0 ]; then
@@ -138,7 +144,7 @@ fi
 # Wait for the instance to be launched
 echo "Waiting for instance to finish launching"
 while true; do
-    state=$(aws lightsail get-instance --region $REGION --instance-name $INSTANCE_NAME | jq -r '.instance.state.name')
+    state=$(aws --no-cli-pager lightsail get-instance --region $REGION --instance-name $INSTANCE_NAME | jq -r '.instance.state.name')
     if [ "$state" == "running" ]; then
         break
     fi
@@ -148,12 +154,12 @@ done
 
 # Get the public IP address of the instance
 echo "Getting public IP address of instance"
-instance_ip=$(aws lightsail get-instance --region $REGION --instance-name $INSTANCE_NAME | jq -r '.instance.publicIpAddress')
+instance_ip=$(aws --no-cli-pager lightsail get-instance --region $REGION --instance-name $INSTANCE_NAME | jq -r '.instance.publicIpAddress')
 echo $instance_ip
 
 # Open the necessary ports in the instance's firewall
 echo "Opening necessary ports on the instance"
-aws lightsail open-instance-public-ports --region $REGION --instance-name $INSTANCE_NAME --port-info fromPort=0,protocol=all,toPort=65535
+aws --no-cli-pager lightsail open-instance-public-ports --region $REGION --instance-name $INSTANCE_NAME --port-info fromPort=0,protocol=all,toPort=65535
 
 # Wait briefly for SSH to become available
 echo "Waiting up to 90s for SSH to become available..."
