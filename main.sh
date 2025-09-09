@@ -43,16 +43,21 @@ if [ -z "$KEYPAIR_NAME" ] && [ -n "$LIGHTSAIL_KEYPAIR_NAME" ]; then
   KEYPAIR_NAME="$LIGHTSAIL_KEYPAIR_NAME"
 fi
 
-# Check if env variables are loaded, either locally or from GitHub secrets, or other places. If not, exit with code 1
-if [ -z "$LIGHTSAIL_PRIVATE_KEY_BASE64" ]; then
-  echo $LIGHTSAIL_PRIVATE_KEY_BASE64
-  echo "LIGHTSAIL_PRIVATE_KEY_BASE64 is not set"
+# Resolve private key: prefer pre-decoded file, fallback to base64 env
+if [ -n "${LIGHTSAIL_PRIVATE_KEY_FILE-}" ] && [ -f "$LIGHTSAIL_PRIVATE_KEY_FILE" ]; then
+  cp "$LIGHTSAIL_PRIVATE_KEY_FILE" "$PRIVATE_KEY_FILENAME"
+  chmod 400 "$PRIVATE_KEY_FILENAME"
+elif [ -n "${LIGHTSAIL_PRIVATE_KEY_BASE64-}" ]; then
+  umask 077
+  if ! printf %s "$LIGHTSAIL_PRIVATE_KEY_BASE64" | base64 -d > "$PRIVATE_KEY_FILENAME"; then
+    echo "Failed to decode LIGHTSAIL_PRIVATE_KEY_BASE64"
+    exit 1
+  fi
+  chmod 400 "$PRIVATE_KEY_FILENAME"
+else
+  echo "Neither LIGHTSAIL_PRIVATE_KEY_FILE nor LIGHTSAIL_PRIVATE_KEY_BASE64 is set"
   exit 1
 fi
-
-# Get private key from env and save locally
-echo $LIGHTSAIL_PRIVATE_KEY_BASE64 | base64 --decode > $PRIVATE_KEY_FILENAME
-chmod 400 $PRIVATE_KEY_FILENAME
 
 # Check that the private key file exists
 if [ ! -f $PRIVATE_KEY_FILENAME ]; then
@@ -150,8 +155,18 @@ echo $instance_ip
 echo "Opening necessary ports on the instance"
 aws lightsail open-instance-public-ports --region $REGION --instance-name $INSTANCE_NAME --port-info fromPort=0,protocol=all,toPort=65535
 
+# Wait briefly for SSH to become available
+echo "Waiting up to 90s for SSH to become available..."
+for i in {1..18}; do
+  if timeout 3 bash -c "</dev/tcp/$instance_ip/22" 2>/dev/null; then
+    echo "Port 22 is open."
+    break
+  fi
+  sleep 5
+done
+
 # Set the maximum number of attempts
-max_attempts=5
+max_attempts=10
 
 # Set a counter variable to track the number of attempts
 attempts=0
@@ -160,7 +175,7 @@ attempts=0
 echo "Attempting to ssh into the server"
 while [ $attempts -lt $max_attempts ]; do
   # Connect to the instance and run the remote-script, and save the output to `INSTALLATION_OUTPUT_FILEPATH`
-  ssh -o StrictHostKeyChecking=no -i $PRIVATE_KEY_FILENAME ubuntu@$instance_ip 'bash -s' < ./scripts/remote-script.sh > $INSTALLATION_OUTPUT_FILEPATH
+  ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=15 -o ServerAliveCountMax=2 -i "$PRIVATE_KEY_FILENAME" ubuntu@"$instance_ip" 'bash -s' < ./scripts/remote-script.sh > "$INSTALLATION_OUTPUT_FILEPATH"
   if [ $? -eq 0 ]; then
     # The connection succeeded, so break out of the loop
     break

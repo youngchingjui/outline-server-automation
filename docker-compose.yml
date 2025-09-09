@@ -14,6 +14,10 @@ services:
 
       # Lightsail SSH private key (base64-encoded, single line)
       - LIGHTSAIL_PRIVATE_KEY_BASE64=${LIGHTSAIL_PRIVATE_KEY_BASE64}
+      # Prefer decoded key file path if you mount/provide one (optional)
+      - LIGHTSAIL_PRIVATE_KEY_FILE=${LIGHTSAIL_PRIVATE_KEY_FILE}
+      # Ensure Lightsail instance uses the matching key pair name
+      - LIGHTSAIL_KEYPAIR_NAME=${LIGHTSAIL_KEYPAIR_NAME}
 
       # Optional settings
       - AVAILABILITY_ZONE=${AVAILABILITY_ZONE}
