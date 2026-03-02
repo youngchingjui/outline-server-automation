@@ -1,13 +1,37 @@
-name: Create New Server
+name: Refresh Outline Server
 on:
   schedule:
     - cron: "0 6,14,22 * * *"
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Optional: instance name (default is auto-generated)"
+        required: false
+      zone:
+        description: "Optional: availability zone (e.g., ap-northeast-1a)"
+        required: false
+      keypair_name:
+        description: "Optional: Lightsail key pair name to attach to the instance"
+        required: false
+      do_not_delete:
+        description: "Do not delete older instances after refresh"
+        required: false
+        type: boolean
+        default: false
+      verbose:
+        description: "Enable verbose logging"
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - main
 permissions:
-  id-token: write # This is required for requesting the JWT
-  contents: read # This is required for actions/checkout
+  id-token: write # Required for requesting the OIDC JWT
+  contents: read  # Required for actions/checkout
+concurrency:
+  group: outline-refresh
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -20,7 +44,31 @@ jobs:
           role-to-assume: arn:aws:iam::362142771237:role/github-actions-role
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Run script
+      - name: Build script args from inputs
+        id: build-args
+        shell: bash
+        run: |
+          ARGS=()
+          if [ -n "${{ github.event.inputs.name }}" ]; then ARGS+=(--name "${{ github.event.inputs.name }}"); fi
+          if [ -n "${{ github.event.inputs.zone }}" ]; then ARGS+=(--zone "${{ github.event.inputs.zone }}"); fi
+          if [ -n "${{ github.event.inputs.keypair_name }}" ]; then ARGS+=(--keypair "${{ github.event.inputs.keypair_name }}"); fi
+          if [ "${{ github.event.inputs.do_not_delete }}" = 'true' ]; then ARGS+=(--do-not-delete); fi
+          if [ "${{ github.event.inputs.verbose }}" = 'true' ]; then ARGS+=(--verbose); fi
+          printf "args=%s\n" "${ARGS[*]}" >> "$GITHUB_OUTPUT"
+      - name: Run Outline refresh script
         env:
           LIGHTSAIL_PRIVATE_KEY_BASE64: ${{ secrets.LIGHTSAIL_PRIVATE_KEY_BASE64 }}
-        run: bash main.sh 2>&1
+        run: bash main.sh ${{ steps.build-args.outputs.args }} 2>&1
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Outline refresh run"
+            echo "- Trigger: ${{ github.event_name }}"
+            echo "- Status: ${{ job.status }}"
+            echo "- Actor: ${{ github.actor }}"
+            echo "- Ref: ${{ github.ref }}"
+            echo "- Inputs: name='${{ github.event.inputs.name }}' zone='${{ github.event.inputs.zone }}' do_not_delete='${{ github.event.inputs.do_not_delete }}' verbose='${{ github.event.inputs.verbose }}' keypair_name='${{ github.event.inputs.keypair_name }}'"
+          } >> "$GITHUB_STEP_SUMMARY"
+
