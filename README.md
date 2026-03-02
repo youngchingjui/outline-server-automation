@@ -142,3 +142,14 @@ The upload script supports environment variables:
 ## Alternatives to cycling Lightsail IPs
 
 See `docs/ALTERNATIVES.md` for other approaches to rotate or shield IP addresses to reduce blocking while keeping costs in check.
+
+---
+
+## IP rotation strategies (how to avoid full rebuilds)
+
+If you want faster, less disruptive IP changes, read `docs/IP_ROTATION.md` for a playbook covering:
+- Swapping Lightsail Static IPs or EC2 Elastic IPs on a warm server
+- Using a hostname in your Shadowsocks URL and updating DNS
+- Baking images/snapshots for quick rebuilds
+- When (and when not) to consider load balancers or multi‑provider pools
+
